@@ -2,7 +2,7 @@
 
 - **Student Name**: Đào Văn Sơn
 - **Student ID**: 2A202600032
-- **Role in Group**: Người C — ReAct Agent Developer
+- **Role in Group**: ReAct Agent Developer
 - **Date**: 2026-04-06
 
 ---

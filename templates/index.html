@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Travel Advisor AI - Group 28</title>
+<style>
+/* ── Reset & Variables ──────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #0f1117;
+  --bg2:        #1a1d27;
+  --bg3:        #22263a;
+  --border:     #2e3250;
+  --accent1:    #6366f1;   /* Agent - indigo */
+  --accent2:    #10b981;   /* Chatbot - emerald */
+  --thought:    #60a5fa;   /* blue */
+  --action:     #f59e0b;   /* amber */
+  --obs:        #34d399;   /* green */
+  --final:      #a78bfa;   /* violet */
+  --fallback:   #f87171;   /* red */
+  --text:       #e2e8f0;
+  --text2:      #94a3b8;
+  --text3:      #64748b;
+  --token-bg:   #1e293b;
+  --radius:     12px;
+  --radius-sm:  8px;
+  --shadow:     0 4px 24px rgba(0,0,0,.4);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.header-title { display: flex; align-items: center; gap: 10px; }
+.header h1 { font-size: 1.25rem; font-weight: 700; color: #fff; }
+.header-badge {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  display: flex; align-items: center; gap: 6px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent2); display: inline-block; }
+.dot.pulse { animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── Input Section ───────────────────────────────────────────────────── */
+.input-section {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 20px 24px;
+}
+.input-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+.input-wrap { flex: 1; position: relative; }
+.input-wrap textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 14px;
+  padding: 14px 16px;
+  resize: none;
+  outline: none;
+  transition: border-color .2s;
+  font-family: inherit;
+  line-height: 1.5;
+}
+.input-wrap textarea:focus { border-color: var(--accent1); }
+.input-wrap textarea::placeholder { color: var(--text3); }
+.btn-ask {
+  background: var(--accent1);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  padding: 14px 28px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: 8px;
+}
+.btn-ask:hover:not(:disabled) { background: #4f46e5; transform: translateY(-1px); }
+.btn-ask:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* Quick examples */
+.examples {
+  max-width: 1400px;
+  margin: 10px auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.example-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all .15s;
+}
+.example-chip:hover { border-color: var(--accent1); color: var(--text); }
+
+/* ── Progress Bar ────────────────────────────────────────────────────── */
+#progress-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  width: 0;
+  transition: width .3s;
+}
+#progress-bar.indeterminate {
+  width: 100%;
+  animation: indeterminate 1.4s ease infinite;
+  background-size: 200% 100%;
+  background-image: linear-gradient(90deg, var(--bg) 0%, var(--accent1) 40%, var(--accent2) 60%, var(--bg) 100%);
+}
+@keyframes indeterminate { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── Main Layout ─────────────────────────────────────────────────────── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  max-width: 1800px;
+  margin: 0 auto;
+  height: calc(100vh - 145px);
+  overflow: hidden;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.panel:last-child { border-right: none; }
+
+/* ── Panel Header ────────────────────────────────────────────────────── */
+.panel-header {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.panel-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.agent-panel .panel-icon  { background: rgba(99,102,241,.2); }
+.chatbot-panel .panel-icon { background: rgba(16,185,129,.2); }
+.panel-title { font-weight: 600; font-size: 1rem; }
+.agent-panel .panel-title  { color: #818cf8; }
+.chatbot-panel .panel-title { color: #34d399; }
+.panel-status {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+.status-idle     { background: rgba(100,116,139,.15); color: var(--text3); }
+.status-thinking { background: rgba(99,102,241,.2);   color: #818cf8; }
+.status-done     { background: rgba(16,185,129,.15);  color: #34d399; }
+.status-error    { background: rgba(239,68,68,.15);   color: #f87171; }
+
+/* ── Panel Body ──────────────────────────────────────────────────────── */
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.panel-body::-webkit-scrollbar { width: 5px; }
+.panel-body::-webkit-scrollbar-track { background: transparent; }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* ── Empty State ─────────────────────────────────────────────────────── */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text3);
+  gap: 12px;
+  text-align: center;
+}
+.empty-state .big-icon { font-size: 48px; opacity: .4; }
+.empty-state p { font-size: 13px; }
+
+/* ── Skeleton loader ─────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--bg3) 25%, var(--border) 50%, var(--bg3) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  border-radius: 6px;
+  height: 14px;
+  margin-bottom: 10px;
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+.skeleton.w60 { width: 60%; }
+.skeleton.w80 { width: 80%; }
+.skeleton.w40 { width: 40%; }
+.skeleton.h8  { height: 8px; }
+
+/* ── Trace Steps ─────────────────────────────────────────────────────── */
+.trace-container { display: flex; flex-direction: column; gap: 8px; }
+
+.trace-step {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  animation: fadeSlideIn .25s ease both;
+}
+@keyframes fadeSlideIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+
+.step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  background: var(--bg3);
+  user-select: none;
+  transition: background .15s;
+}
+.step-header:hover { background: var(--border); }
+.step-badge {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.step-summary {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chevron {
+  color: var(--text3);
+  font-size: 11px;
+  transition: transform .2s;
+}
+.trace-step.open .chevron { transform: rotate(180deg); }
+
+.step-body {
+  display: none;
+  padding: 12px 14px;
+  background: var(--bg2);
+  border-top: 1px solid var(--border);
+  flex-direction: column;
+  gap: 10px;
+}
+.trace-step.open .step-body { display: flex; }
+
+/* Thought / Action / Observation / Final */
+.trace-block {
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.trace-block-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+.trace-block-text {
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.block-thought  { background: rgba(96,165,250,.08);  border-left: 3px solid var(--thought); }
+.block-thought  .trace-block-label { color: var(--thought); }
+.block-action   { background: rgba(245,158,11,.08);  border-left: 3px solid var(--action); }
+.block-action   .trace-block-label { color: var(--action); }
+.block-obs      { background: rgba(52,211,153,.08);  border-left: 3px solid var(--obs); }
+.block-obs      .trace-block-label { color: var(--obs); }
+.block-final    { background: rgba(167,139,250,.08); border-left: 3px solid var(--final); }
+.block-final    .trace-block-label { color: var(--final); }
+.block-fallback { background: rgba(248,113,113,.08); border-left: 3px solid var(--fallback); }
+.block-fallback .trace-block-label { color: var(--fallback); }
+
+/* Step meta */
+.step-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.meta-chip {
+  font-size: 11px;
+  color: var(--text3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.meta-chip span { color: var(--text2); font-weight: 500; }
+
+/* Action pill */
+.action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245,158,11,.15);
+  border: 1px solid rgba(245,158,11,.3);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: 'Consolas', 'Fira Code', monospace;
+}
+.action-pill .tool-name { color: var(--action); font-weight: 700; }
+.action-pill .tool-args { color: var(--text2); }
+
+/* ── Final Answer Card ───────────────────────────────────────────────── */
+.final-card {
+  background: linear-gradient(135deg, rgba(167,139,250,.08), rgba(99,102,241,.05));
+  border: 1px solid rgba(167,139,250,.3);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 8px;
+  animation: fadeSlideIn .3s ease both;
+}
+.final-card-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: var(--final);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.final-card-text {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Chatbot answer */
+.chatbot-answer-card {
+  background: var(--bg2);
+  border: 1px solid rgba(16,185,129,.2);
+  border-radius: var(--radius);
+  padding: 16px;
+  animation: fadeSlideIn .3s ease both;
+}
+.chatbot-answer-text {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ── Metrics Footer ──────────────────────────────────────────────────── */
+.panel-footer {
+  background: var(--token-bg);
+  border-top: 1px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.metric { display: flex; flex-direction: column; gap: 2px; }
+.metric-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text3);
+}
+.metric-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.metric-value.highlight { color: var(--accent1); }
+.metric-value.highlight2 { color: var(--accent2); }
+
+/* ── Fallback banner ─────────────────────────────────────────────────── */
+.fallback-banner {
+  background: rgba(248,113,113,.1);
+  border: 1px solid rgba(248,113,113,.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--fallback);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .panel { min-height: 60vh; border-right: none; border-bottom: 1px solid var(--border); }
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────────────────── -->
+<div class="header">
+  <div class="header-title">
+    <span style="font-size:22px">&#127758;</span>
+    <h1>Travel Advisor AI</h1>
+    <span style="color:#64748b;font-size:13px;margin-left:4px">Group 28</span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div class="header-badge">
+      <span class="dot"></span>
+      <span id="hdr-provider">{{ provider }}</span>
+    </div>
+    <div class="header-badge">
+      <span style="opacity:.5">model</span>
+      <span id="hdr-model">{{ model }}</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Input Section ─────────────────────────────────────────────────────── -->
+<div class="input-section">
+  <div class="input-row">
+    <div class="input-wrap">
+      <textarea id="question-input" rows="2"
+        placeholder="Nhap cau hoi du lich cua ban... (vi du: Thoi tiet o Hoi An the nao? Nen di dau o Da Nang 4 ngay?)"
+        onkeydown="handleEnter(event)"></textarea>
+    </div>
+    <button class="btn-ask" id="ask-btn" onclick="askBoth()">
+      <span>&#9654;</span> Hoi ca hai
+    </button>
+  </div>
+  <div class="examples" id="examples"></div>
+</div>
+
+<!-- ── Progress Bar ──────────────────────────────────────────────────────── -->
+<div id="progress-bar"></div>
+
+<!-- ── Main: 2 Panels ────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Agent Panel -->
+  <div class="panel agent-panel">
+    <div class="panel-header">
+      <div class="panel-icon">&#129302;</div>
+      <div>
+        <div class="panel-title">ReAct Agent</div>
+        <div style="font-size:11px;color:var(--text3)">Thought &#8594; Action &#8594; Observation</div>
+      </div>
+      <div class="panel-status status-idle" id="agent-status">Cho...</div>
+    </div>
+    <div class="panel-body" id="agent-body">
+      <div class="empty-state" id="agent-empty">
+        <div class="big-icon">&#129302;</div>
+        <p>Agent se hien thi qua trinh suy nghi<br>va ket qua khi ban dat cau hoi.</p>
+      </div>
+    </div>
+    <div class="panel-footer" id="agent-footer" style="display:none">
+      <div class="metric">
+        <div class="metric-label">Tokens (tong)</div>
+        <div class="metric-value highlight" id="ag-tokens">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Prompt</div>
+        <div class="metric-value" id="ag-prompt-tok">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Completion</div>
+        <div class="metric-value" id="ag-comp-tok">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Wall time</div>
+        <div class="metric-value" id="ag-wall">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">LLM time</div>
+        <div class="metric-value" id="ag-llm-time">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Buoc</div>
+        <div class="metric-value" id="ag-steps">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Tool calls</div>
+        <div class="metric-value" id="ag-tools">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">LLM calls</div>
+        <div class="metric-value" id="ag-llm-calls">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Model</div>
+        <div class="metric-value" id="ag-model" style="font-size:11px">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chatbot Panel -->
+  <div class="panel chatbot-panel">
+    <div class="panel-header">
+      <div class="panel-icon">&#128172;</div>
+      <div>
+        <div class="panel-title">Chatbot Baseline</div>
+        <div style="font-size:11px;color:var(--text3)">Khong co tool - kien thuc chung</div>
+      </div>
+      <div class="panel-status status-idle" id="chatbot-status">Cho...</div>
+    </div>
+    <div class="panel-body" id="chatbot-body">
+      <div class="empty-state" id="chatbot-empty">
+        <div class="big-icon">&#128172;</div>
+        <p>Chatbot se hien thi cau tra loi<br>khi ban dat cau hoi.</p>
+      </div>
+    </div>
+    <div class="panel-footer" id="chatbot-footer" style="display:none">
+      <div class="metric">
+        <div class="metric-label">Tokens (tong)</div>
+        <div class="metric-value highlight2" id="cb-tokens">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Prompt</div>
+        <div class="metric-value" id="cb-prompt-tok">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Completion</div>
+        <div class="metric-value" id="cb-comp-tok">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Latency</div>
+        <div class="metric-value" id="cb-latency">-</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label">Model</div>
+        <div class="metric-value" id="cb-model" style="font-size:11px">-</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Scripts ────────────────────────────────────────────────────────────── -->
+<script>
+const EXAMPLES = [
+  "Thoi tiet o Hoi An tuan nay the nao? Nen mac gi?",
+  "Toi co 5 ngay di Da Nang, nen di dau va uoc tinh chi phi 2 nguoi?",
+  "So sanh Phu Quoc va Nha Trang: dau phu hop cho gia dinh co tre nho?",
+  "Nguoi lan dau di Nhat can biet nhung phong tuc gi?",
+  "Meo chong say tau xe khi di du lich?",
+  "Thoi tiet Bangkok hien tai va co gi choi khong?",
+];
+
+// ── Init examples ──────────────────────────────────────────────────────────
+(function initExamples() {
+  const wrap = document.getElementById("examples");
+  EXAMPLES.forEach(ex => {
+    const chip = document.createElement("div");
+    chip.className = "example-chip";
+    chip.textContent = ex.length > 50 ? ex.slice(0, 50) + "..." : ex;
+    chip.title = ex;
+    chip.onclick = () => {
+      document.getElementById("question-input").value = ex;
+      document.getElementById("question-input").focus();
+    };
+    wrap.appendChild(chip);
+  });
+})();
+
+// ── Keyboard shortcut ─────────────────────────────────────────────────────
+function handleEnter(e) {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askBoth(); }
+}
+
+// ── Main: ask both ─────────────────────────────────────────────────────────
+async function askBoth() {
+  const question = document.getElementById("question-input").value.trim();
+  if (!question) { shake("question-input"); return; }
+
+  const btn = document.getElementById("ask-btn");
+  btn.disabled = true;
+  btn.innerHTML = '<span class="dot pulse"></span> Dang xu ly...';
+
+  showProgress(true);
+  resetPanels();
+
+  // --- Parallel fetch ---
+  const agentPromise   = fetch("/api/agent",   { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({question}) });
+  const chatbotPromise = fetch("/api/chatbot", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({question}) });
+
+  // Chatbot usually faster — show when ready
+  chatbotPromise
+    .then(r => r.json())
+    .then(renderChatbot)
+    .catch(e => showError("chatbot", e.message));
+
+  // Agent with trace
+  agentPromise
+    .then(r => r.json())
+    .then(renderAgent)
+    .catch(e => showError("agent", e.message))
+    .finally(() => {
+      showProgress(false);
+      btn.disabled = false;
+      btn.innerHTML = '<span>&#9654;</span> Hoi ca hai';
+    });
+}
+
+// ── Reset panels ──────────────────────────────────────────────────────────
+function resetPanels() {
+  ["agent", "chatbot"].forEach(k => {
+    setStatus(k, "thinking", k === "agent" ? "Dang suy nghi..." : "Dang xu ly...");
+    document.getElementById(`${k}-footer`).style.display = "none";
+    document.getElementById(`${k}-body`).innerHTML = renderSkeleton();
+  });
+}
+
+function renderSkeleton() {
+  return `<div style="padding:8px 0">
+    <div class="skeleton w60"></div>
+    <div class="skeleton w80 h8"></div>
+    <div class="skeleton w40 h8"></div>
+    <br>
+    <div class="skeleton w80"></div>
+    <div class="skeleton w60 h8"></div>
+  </div>`;
+}
+
+// ── Render Agent ──────────────────────────────────────────────────────────
+function renderAgent(data) {
+  if (data.error) { showError("agent", data.error); return; }
+
+  const body = document.getElementById("agent-body");
+  body.innerHTML = "";
+
+  const trace = data.frontend_trace || [];
+  const wrap  = document.createElement("div");
+  wrap.className = "trace-container";
+
+  // Render each step
+  trace.forEach((step, idx) => {
+    if (step.step === "FALLBACK") {
+      const banner = document.createElement("div");
+      banner.className = "fallback-banner";
+      banner.innerHTML = `<span>&#9888;&#65039;</span> FALLBACK: ${esc(step.reason)}`;
+      wrap.appendChild(banner);
+      return;
+    }
+
+    const hasFinal = !!step.final_answer;
+    const stepEl   = document.createElement("div");
+    stepEl.className = "trace-step" + (hasFinal || idx === trace.length - 1 ? " open" : "");
+
+    // Summary line for collapsed view
+    let summaryText = "";
+    if (step.thought) summaryText = step.thought.slice(0, 60);
+    if (step.action)  summaryText = `Tool: ${step.action.tool}(${step.action.args})`.slice(0, 60);
+
+    stepEl.innerHTML = `
+      <div class="step-header" onclick="toggleStep(this.parentElement)">
+        <div class="step-badge">Buoc ${step.step}</div>
+        <div class="step-summary">${esc(summaryText)}...</div>
+        <div class="chevron">&#9660;</div>
+      </div>
+      <div class="step-body">
+        ${step.thought ? `<div class="trace-block block-thought">
+          <div class="trace-block-label">&#128161; Thought</div>
+          <div class="trace-block-text">${esc(step.thought)}</div>
+        </div>` : ""}
+
+        ${step.action ? `<div class="trace-block block-action">
+          <div class="trace-block-label">&#9889; Action</div>
+          <div class="action-pill">
+            <span class="tool-name">${esc(step.action.tool)}</span>
+            <span style="color:var(--text3)">(</span>
+            <span class="tool-args">${esc(step.action.args)}</span>
+            <span style="color:var(--text3)">)</span>
+          </div>
+        </div>` : ""}
+
+        ${step.observation ? `<div class="trace-block block-obs">
+          <div class="trace-block-label">&#128270; Observation</div>
+          <div class="trace-block-text">${esc(step.observation)}</div>
+        </div>` : ""}
+
+        ${hasFinal ? `<div class="trace-block block-final">
+          <div class="trace-block-label">&#10004; Final Answer</div>
+          <div class="trace-block-text">${esc(step.final_answer)}</div>
+        </div>` : ""}
+
+        ${step.tokens ? `<div class="step-meta">
+          <div class="meta-chip">&#128200; tokens <span>${step.tokens.total_tokens || 0}</span></div>
+          <div class="meta-chip">&#9201; LLM <span>${step.latency_ms || 0}ms</span></div>
+          ${step.tool_latency_ms !== undefined ? `<div class="meta-chip">&#128296; tool <span>${step.tool_latency_ms}ms</span></div>` : ""}
+        </div>` : ""}
+      </div>`;
+
+    wrap.appendChild(stepEl);
+    // Animate in with delay
+    stepEl.style.animationDelay = `${idx * 60}ms`;
+  });
+
+  body.appendChild(wrap);
+
+  // Fallback banner at bottom
+  if (data.fallback_used) {
+    const banner = document.createElement("div");
+    banner.className = "fallback-banner";
+    banner.innerHTML = `<span>&#9888;&#65039;</span> Che do du phong duoc kich hoat - du lieu thoi gian thuc khong kha dung.`;
+    body.appendChild(banner);
+  }
+
+  // Metrics footer
+  const tok = data.tokens || {};
+  el("ag-tokens").textContent    = (tok.total || 0).toLocaleString();
+  el("ag-prompt-tok").textContent  = (tok.prompt || 0).toLocaleString();
+  el("ag-comp-tok").textContent    = (tok.completion || 0).toLocaleString();
+  el("ag-wall").textContent        = `${data.latency_ms || 0}ms`;
+  el("ag-llm-time").textContent    = `${data.llm_latency_ms || 0}ms`;
+  el("ag-steps").textContent       = data.iterations || 0;
+  el("ag-tools").textContent       = (data.tool_calls || []).length;
+  el("ag-llm-calls").textContent   = data.llm_calls || 0;
+  el("ag-model").textContent       = data.model || "";
+  el("agent-footer").style.display = "flex";
+  setStatus("agent", "done", `Xong - ${data.iterations} buoc`);
+}
+
+// ── Render Chatbot ────────────────────────────────────────────────────────
+function renderChatbot(data) {
+  if (data.error) { showError("chatbot", data.error); return; }
+
+  const body = document.getElementById("chatbot-body");
+  body.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "chatbot-answer-card";
+  card.innerHTML = `<div class="chatbot-answer-text">${esc(data.answer || "")}</div>`;
+  body.appendChild(card);
+
+  const tok = data.tokens || {};
+  el("cb-tokens").textContent     = (tok.total || 0).toLocaleString();
+  el("cb-prompt-tok").textContent   = (tok.prompt || 0).toLocaleString();
+  el("cb-comp-tok").textContent     = (tok.completion || 0).toLocaleString();
+  el("cb-latency").textContent      = `${data.latency_ms || 0}ms`;
+  el("cb-model").textContent        = data.model || "";
+  el("chatbot-footer").style.display = "flex";
+  setStatus("chatbot", "done", "Xong");
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id); }
+
+function esc(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/\n/g,"<br>");
+}
+
+function setStatus(panel, type, text) {
+  const el = document.getElementById(`${panel}-status`);
+  el.className = `panel-status status-${type}`;
+  el.textContent = text;
+}
+
+function showError(panel, msg) {
+  document.getElementById(`${panel}-body`).innerHTML =
+    `<div class="fallback-banner" style="margin:0">
+       <span>&#10060;</span> Loi: ${esc(msg)}
+     </div>`;
+  setStatus(panel, "error", "Loi");
+}
+
+function toggleStep(el) { el.classList.toggle("open"); }
+
+function showProgress(on) {
+  const bar = document.getElementById("progress-bar");
+  if (on) {
+    bar.classList.add("indeterminate");
+  } else {
+    bar.classList.remove("indeterminate");
+  }
+}
+
+function shake(id) {
+  const el = document.getElementById(id);
+  el.style.borderColor = "#f87171";
+  setTimeout(() => el.style.borderColor = "", 600);
+}
+</script>
+</body>
+</html>

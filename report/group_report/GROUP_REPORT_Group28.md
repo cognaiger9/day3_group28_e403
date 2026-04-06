@@ -1,7 +1,7 @@
 # Group Report: Lab 3 - Production-Grade Agentic System
 
 - **Team Name**: Group 28
-- **Team Members**: Trương Gia Anh Ngọc (Tools), Nguyễn Trọng Tín (Chatbot), Đào Văn Sơn (Agent), Phạm Minh Quang (Web UI), Đinh Công Tài(QA)
+- **Team Members**: Trương Gia Ngọc (Tools), Nguyễn Trọng Tín (Chatbot), Đào Văn Sơn (Agent), Phạm Minh Quang (Web UI), Đinh Công Tài(QA)
 - **Use Case**: Tư vấn Du lịch Thông minh
 - **Deployment Date**: 2026-04-06
 
